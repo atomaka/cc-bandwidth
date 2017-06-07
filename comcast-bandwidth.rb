@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 
 require "addressable/uri"
+require "date"
 require "dotenv"
 require "json"
 require "mechanize"
@@ -37,6 +38,18 @@ def login_uri
   )
 end
 
+def total_hours_in_month
+  Date.new(Time.new.year, Time.new.month, -1).day * 24
+end
+
+def past_hours_in_month
+  (Time.new.day - 1) * 24 + (Time.new.hour - 1)
+end
+
+def projected_usage(current_usage)
+  ((current_usage / past_hours_in_month) * total_hours_in_month).round(2)
+end
+
 page = agent.get(login_uri)
 login_form = page.form("signin")
 login_form.user = ENV["COMCAST_USERNAME"]
@@ -46,7 +59,13 @@ agent.submit(login_form)
 page = agent.get("https://customer.xfinity.com/apis/services/internet/usage")
 usage = JSON.parse(page.body)
 
-home = usage["usageMonths"].last["homeUsage"]
-allowable = usage["usageMonths"].last["allowableUsage"]
+home_usage = usage["usageMonths"].last["homeUsage"]
+allowable_usage = usage["usageMonths"].last["allowableUsage"]
 
-puts "#{home} of #{allowable} used"
+details = {
+  home_usage: home_usage,
+  allowable_usage: allowable_usage,
+  projected_usage: projected_usage(home_usage),
+}
+
+puts details
